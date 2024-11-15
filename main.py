@@ -230,7 +230,6 @@ async def main_page(request: Request, current_user: Annotated[dict, Depends(get_
         "user": current_user  # или передайте отдельные данные, например, current_user['fullname']
     })
 
-
 @app.get("/test", response_class=HTMLResponse)
 async def test(request: Request):
     return templates.TemplateResponse("test.html", {"request": request})
