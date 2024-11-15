@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ bed.title }}</title>
+    <link rel="stylesheet" type="text/css" href="/static/furnit_style.css">
+</head>
+<body>
+    <h1>{{ bed.title }}</h1>
+    <button onclick="location.href = '/beds';">Back to beds</button>
+    
+    <div class="bed-detail">
+        <img src="{{ bed.image_url }}" alt="{{ bed.title }}" class="bed-image">
+        <div class="bed-info">
+            <h2>Description</h2>
+            <p>{{ bed.description }}</p>
+            <h3>Price: ${{ bed.price }}</h3>
+        </div>
+    </div>
+</body>
+</html>

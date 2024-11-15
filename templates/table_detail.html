@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ table.title }}</title>
+    <link rel="stylesheet" type="text/css" href="/static/furnit_style.css">
+</head>
+<body>
+    <h1>{{ table.title }}</h1>
+    <button onclick="location.href = '/tables';">Back to Tables</button>
+    
+    <div class="table-detail">
+        <img src="{{ table.image_url }}" alt="{{ table.title }}" class="table-image">
+        <div class="table-info">
+            <h2>Description</h2>
+            <p>{{ table.description }}</p>
+            <h3>Price: ${{ table.price }}</h3>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<html>
+<head>
+    <title>Beds</title>
+    <link rel="stylesheet" type="text/css" href="/static/furnit_style.css">
+</head>
+<body>
+    <h1>Beds</h1>
+    <button onclick="location.href = '/main';">Back</button>
+    <div class="gallery">
+        {% for bed in beds %}
+        <button class="zap" onclick="location.href = '/beds/{{ bed.id }}';">
+            <div class="card">
+                <img src="{{ bed.image_url }}" alt="{{ bed.title }}" class="card-image">
+                <div class="card-content">
+                    <h2>{{ bed.title }}</h2>
+                    <p>{{ bed.description }}</p>
+                    <p>Price: ${{ bed.price }}</p>
+                </div>
+            </div>
+        </button>
+        {% endfor %}
+    </div>
+    
+    <div class="pagination">
+        {% if current_page > 1 %}
+            <button onclick="location.href = '/beds?page={{ current_page - 1 }}';">Previous</button>
+        {% endif %}
+        <span>Page {{ current_page }} of {{ total_pages }}</span>
+        {% if current_page < total_pages %}
+            <button onclick="location.href = '/beds?page={{ current_page + 1 }}';">Next</button>
+        {% endif %}
+    </div>
+</body>
+</html>

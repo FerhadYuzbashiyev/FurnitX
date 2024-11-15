@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register</title>
+    <link rel="stylesheet" type="text/css" href="/static/register.css">
+</head>
+<body>
+    <div class="registration-container">
+        <h2>Register</h2>
+
+        <!-- Display registered user details if they exist -->
+        {% if test %}
+            <div class="registered-info">
+                <p><strong>Full Name:</strong> {{ test.fullname }}</p>
+                <p><strong>Email:</strong> {{ test.email }}</p>
+            </div>
+        {% endif %}
+
+        <!-- Registration form -->
+        <form id="registrationForm" action="/register" method="POST">
+            <div class="form-group">
+                <label for="fullname">Full Name</label>
+                <input type="text" id="fullname" name="fullname" value="{{ test.fullname if test else '' }}" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="text" id="email" name="email" value="{{ test.email if test else '' }}" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Register</button>
+        </form>
+    </div>
+</body>
+</html>
