@@ -305,13 +305,13 @@ async def protected_route(current_user: Annotated[UserAuth, Depends(get_current_
     print(current_user)
     return {"message": f"Hello, {current_user[0]}!"}
 
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    if request.url.path not in ["/login", "/register", "/open-route"]:
-        token = request.headers.get("Authorization")
-        print(token)
-        print("TEST")
-        if not token or not await get_current_user(token):  # Проверка авторизации
-            raise HTTPException(status_code=401, detail="Not authenticated")
-    response = await call_next(request)
-    return response
+# @app.middleware("http")
+# async def auth_middleware(request: Request, call_next):
+#     if request.url.path not in ["/login", "/register", "/open-route"]:
+#         token = request.headers.get("Authorization")
+#         print(token)
+#         print("TEST")
+#         if not token or not await get_current_user(token):  # Проверка авторизации
+#             raise HTTPException(status_code=401, detail="Not authenticated")
+#     response = await call_next(request)
+#     return response
