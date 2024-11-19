@@ -290,19 +290,21 @@ async def show_login_form(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/login", response_class=HTMLResponse)
-async def login(request: LoginRequest = Form(...), session: AsyncSession = Depends(get_async_session)):
-    stmt = select(User.c.id, User.c.email, User.c.hashed_password).where(User.c.email == request.username)
+async def login(request: Request, session: AsyncSession = Depends(get_async_session), username: str = Form(...), password: str = Form(...)):
+    stmt = select(User.c.id, User.c.email, User.c.hashed_password).where(User.c.email == username)
     result = await session.execute(stmt)
     user = result.fetchone()
-    if user is None or not verify_password(request.password, user[2]):
+    if user is None or not verify_password(password, user[2]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
-    
+
     access_token = create_access_token(data={"sub": user[0], "email": user[1]})
     
-    response = templates.TemplateResponse("login.html", {"request": request, "access_token": access_token, "access_type": "Bearer"})
+    # Устанавливаем токен в куки и заголовок
+    response = RedirectResponse(url="/main")
     response.set_cookie(key="Authorization", value=f"Bearer {access_token}", httponly=True)
-    print(access_token)
+    response.headers["Authorization"] = f"Bearer {access_token}"
     return response
+
 
 @app.get("/protected-route")
 async def protected_route(current_user: Annotated[UserAuth, Depends(get_current_user)]):
