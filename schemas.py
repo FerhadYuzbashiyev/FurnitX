@@ -27,6 +27,14 @@ class InsertFurniture(BaseModel):
     manufacturer: CountryEnum
     image_url: str
 
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
 class InsertFurnitureResponse(BaseModel):
     data: InsertFurniture
 

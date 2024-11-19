@@ -1,20 +1,21 @@
 from math import ceil
 from datetime import datetime, timedelta
 from typing import Annotated
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.security import OAuth2PasswordRequestForm, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, insert, select, delete
-from auth import create_access_token, get_current_user, get_password_hash, verify_password
+from auth import create_access_token, get_current_user, get_password_hash, validate_authorization_header, verify_password
 from database import get_async_session, AsyncSession
 from models import Furniture, CountryEnum, MaterialEnum, CategoryEnum, User
-from schemas import CreateUser, GetAllTables, GetAllTablesResponse, InsertFurniture, InsertFurnitureResponse, UserAuth, UserData, UserDataResponse
+from schemas import CreateUser, GetAllTables, GetAllTablesResponse, InsertFurniture, InsertFurnitureResponse, LoginRequest, TokenResponse, UserAuth, UserData, UserDataResponse
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+http_bearer = HTTPBearer()
 
 @app.post("/insert_item")
 async def insert_item(fullname: str, 
@@ -220,14 +221,14 @@ async def get_chair_detail(bed_id: int, request: Request, session: AsyncSession 
     return templates.TemplateResponse("bed_detail.html", {"request": request, "bed": bed_data})
 
 @app.get("/main", response_class=HTMLResponse)
-async def main_page(request: Request, current_user: Annotated[dict, Depends(get_current_user)]):
+async def main_page(request: Request, current_user = Annotated[dict, Depends(get_current_user)]):
     # Выводим данные пользователя, чтобы убедиться, что аутентификация прошла успешно
-    print(f"Current user: {current_user}")
+    # print(f"Current user: {current_user}")
     
     # Передаем данные пользователя в шаблон, если нужно
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "user": current_user  # или передайте отдельные данные, например, current_user['fullname']
+        # "user": current_user
     })
 
 @app.get("/test", response_class=HTMLResponse)
@@ -289,29 +290,34 @@ async def show_login_form(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/login", response_class=HTMLResponse)
-async def login(request: Request, form_data: Annotated[OAuth2PasswordRequestForm, Depends()], session: AsyncSession = Depends(get_async_session)):
-    stmt = select(User.c.id, User.c.email, User.c.hashed_password).where(User.c.email == form_data.username)
+async def login(request: LoginRequest = Form(...), session: AsyncSession = Depends(get_async_session)):
+    stmt = select(User.c.id, User.c.email, User.c.hashed_password).where(User.c.email == request.username)
     result = await session.execute(stmt)
     user = result.fetchone()
-    
-    if user is None or not verify_password(form_data.password, user[2]):  # user[2] - hashed_password
+    if user is None or not verify_password(request.password, user[2]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
-    access_token = create_access_token(data={"sub": user[0], "email": user[1]})  # user[0] - id
+    
+    access_token = create_access_token(data={"sub": user[0], "email": user[1]})
+    
+    response = templates.TemplateResponse("login.html", {"request": request, "access_token": access_token, "access_type": "Bearer"})
+    response.set_cookie(key="Authorization", value=f"Bearer {access_token}", httponly=True)
     print(access_token)
-    return templates.TemplateResponse("login.html", {"request": request, "access_token": access_token, "token_type": "bearer"})
+    return response
 
 @app.get("/protected-route")
 async def protected_route(current_user: Annotated[UserAuth, Depends(get_current_user)]):
     print(current_user)
+    print("TEST_pr_route")
     return {"message": f"Hello, {current_user[0]}!"}
 
-# @app.middleware("http")
-# async def auth_middleware(request: Request, call_next):
-#     if request.url.path not in ["/login", "/register", "/open-route"]:
-#         token = request.headers.get("Authorization")
-#         print(token)
-#         print("TEST")
-#         if not token or not await get_current_user(token):  # Проверка авторизации
-#             raise HTTPException(status_code=401, detail="Not authenticated")
-#     response = await call_next(request)
-#     return response
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if request.url.path not in ["/login", "/register", "/open-route"]:
+        try:
+            payload = await validate_authorization_header(request)
+            print(f"Token payload: {payload}")
+        except HTTPException as e:
+            raise e
+    
+    response = await call_next(request)
+    return response
