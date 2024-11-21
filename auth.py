@@ -51,6 +51,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], sessio
 async def validate_authorization_header(request: Request):
     # Извлекаем заголовок Authorization
     auth_header = request.headers.get("Authorization")
+    print(auth_header) # None
     if not auth_header:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

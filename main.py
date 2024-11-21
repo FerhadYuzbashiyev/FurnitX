@@ -221,10 +221,13 @@ async def get_chair_detail(bed_id: int, request: Request, session: AsyncSession 
     return templates.TemplateResponse("bed_detail.html", {"request": request, "bed": bed_data})
 
 @app.get("/main", response_class=HTMLResponse)
-async def main_page(request: Request, current_user = Annotated[dict, Depends(get_current_user)]):
+async def main_page(request: Request):
+    print("TEST")
     # Выводим данные пользователя, чтобы убедиться, что аутентификация прошла успешно
     # print(f"Current user: {current_user}")
-    
+    validate_authorization_header(request.headers["Authorization"])
+    print(request)
+
     # Передаем данные пользователя в шаблон, если нужно
     return templates.TemplateResponse("index.html", {
         "request": request,
@@ -300,9 +303,10 @@ async def login(request: Request, session: AsyncSession = Depends(get_async_sess
     access_token = create_access_token(data={"sub": user[0], "email": user[1]})
     
     # Устанавливаем токен в куки и заголовок
-    response = RedirectResponse(url="/main")
+    response = templates.TemplateResponse("login.html", {"request": request})
     response.set_cookie(key="Authorization", value=f"Bearer {access_token}", httponly=True)
     response.headers["Authorization"] = f"Bearer {access_token}"
+    print(response.headers["Authorization"])
     return response
 
 
@@ -314,7 +318,12 @@ async def protected_route(current_user: Annotated[UserAuth, Depends(get_current_
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    if request.url.path not in ["/login", "/register", "/open-route"]:
+    endpoints = ["/login", "/register"]
+    isPath = request.url.path not in endpoints
+    print(request.url.path)
+    print("TEST_MIDDLEWARE")
+    print(isPath)
+    if request.url.path not in endpoints:
         try:
             payload = await validate_authorization_header(request)
             print(f"Token payload: {payload}")
