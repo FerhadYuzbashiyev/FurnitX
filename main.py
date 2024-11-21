@@ -221,14 +221,9 @@ async def get_chair_detail(bed_id: int, request: Request, session: AsyncSession 
     return templates.TemplateResponse("bed_detail.html", {"request": request, "bed": bed_data})
 
 @app.get("/main", response_class=HTMLResponse)
-async def main_page(request: Request):
-    print("TEST")
-    # Выводим данные пользователя, чтобы убедиться, что аутентификация прошла успешно
-    # print(f"Current user: {current_user}")
-    validate_authorization_header(request.headers["Authorization"])
-    print(request)
-
-    # Передаем данные пользователя в шаблон, если нужно
+async def main_page(request: Request, Authorization: str = Cookie(None)):
+    print("/main TEST")
+    print("Authorization:", Authorization)
     return templates.TemplateResponse("index.html", {
         "request": request,
         # "user": current_user
@@ -306,7 +301,7 @@ async def login(request: Request, session: AsyncSession = Depends(get_async_sess
     response = templates.TemplateResponse("login.html", {"request": request})
     response.set_cookie(key="Authorization", value=f"Bearer {access_token}", httponly=True)
     response.headers["Authorization"] = f"Bearer {access_token}"
-    print(response.headers["Authorization"])
+    print("Authorization: ", response.headers["Authorization"])
     return response
 
 
@@ -318,17 +313,24 @@ async def protected_route(current_user: Annotated[UserAuth, Depends(get_current_
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    endpoints = ["/login", "/register"]
-    isPath = request.url.path not in endpoints
-    print(request.url.path)
-    print("TEST_MIDDLEWARE")
-    print(isPath)
+    endpoints = ["/login", "/register"]  # Эндпоинты, не требующие аутентификации
     if request.url.path not in endpoints:
+        # Извлекаем токен из куков
+        token = request.cookies.get("Authorization")
+        if not token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        
+        # Удаляем префикс "Bearer " перед проверкой
+        token = token.replace("Bearer ", "")
+        
+        # Валидация токена
         try:
-            payload = await validate_authorization_header(request)
+            payload = validate_authorization_header(token)
             print(f"Token payload: {payload}")
-        except HTTPException as e:
-            raise e
+        except Exception as e:
+            print(f"Token validation failed: {e}")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     
+    # Продолжение выполнения запроса
     response = await call_next(request)
     return response

@@ -11,7 +11,7 @@ from models import User
 
 SECRET_KEY = "SECRET"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 1
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -46,12 +46,12 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], sessio
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    
+
 # Функция проверки заголовка Authorization
 async def validate_authorization_header(request: Request):
     # Извлекаем заголовок Authorization
     auth_header = request.headers.get("Authorization")
-    print(auth_header) # None
+    print("auth_header", auth_header) # None
     if not auth_header:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
