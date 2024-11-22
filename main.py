@@ -1,5 +1,6 @@
 from math import ceil
 from datetime import datetime, timedelta
+import random
 from typing import Annotated
 from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -9,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, insert, select, delete
 from auth import create_access_token, get_current_user, get_password_hash, validate_authorization_header, verify_password
 from database import get_async_session, AsyncSession
-from models import Furniture, CountryEnum, MaterialEnum, CategoryEnum, User
+from models import Furniture, CountryEnum, MaterialEnum, CategoryEnum, OTPPurposeEnum, User, OTP
 from schemas import CreateUser, GetAllTables, GetAllTablesResponse, InsertFurniture, InsertFurnitureResponse, LoginRequest, TokenResponse, UserAuth, UserData, UserDataResponse
 
 app = FastAPI()
@@ -278,9 +279,12 @@ async def create_user(request: Request, user_fields: CreateUser = Form(...), ses
     stmt_id = select(User.c.id).where(User.c.email == user_fields.email)
     result_stmt_id = await session.execute(stmt_id)
     row_id = result_stmt_id.fetchone()[0]
+
     access_token = create_access_token(data={"sub": row_id, "email": user_fields.email})
-    response = templates.TemplateResponse("register.html", {"request": request, "response": response, "test": test})
+
+    response = RedirectResponse(url="/main", status_code=303)
     response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
+    response.headers["Authorization"] = f"Bearer {access_token}"
     return response
     
 @app.get("/login", response_class=HTMLResponse)
@@ -288,22 +292,37 @@ async def show_login_form(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/login", response_class=HTMLResponse)
-async def login(request: Request, session: AsyncSession = Depends(get_async_session), username: str = Form(...), password: str = Form(...)):
-    stmt = select(User.c.id, User.c.email, User.c.hashed_password).where(User.c.email == username)
+async def login(request: Request, login_form: LoginRequest = Form(...), session: AsyncSession = Depends(get_async_session)):
+    stmt = select(User.c.id, User.c.email, User.c.hashed_password).where(User.c.email == login_form.username)
     result = await session.execute(stmt)
     user = result.fetchone()
-    if user is None or not verify_password(password, user[2]):
+    if user is None or not verify_password(login_form.password, user[2]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
     access_token = create_access_token(data={"sub": user[0], "email": user[1]})
-    
-    # Устанавливаем токен в куки и заголовок
-    response = templates.TemplateResponse("login.html", {"request": request})
-    response.set_cookie(key="Authorization", value=f"Bearer {access_token}", httponly=True)
-    response.headers["Authorization"] = f"Bearer {access_token}"
+    print(user[0])
+    response = RedirectResponse(url="/main", status_code=303)
+    response.set_cookie(key="Authorization", value=f"Bearer {access_token}", httponly=True) # Setting JWT to Cookie file
+    response.headers["Authorization"] = f"Bearer {access_token}" # Setting JWT to header
     print("Authorization: ", response.headers["Authorization"])
     return response
 
+@app.post("/otp-create")
+async def otp_create(email: str, session: AsyncSession = Depends(get_async_session)):
+    stmt_user = select(User.c.id, User.c.email).where(email == User.c.email)
+    result = await session.execute(stmt_user)
+    row = result.fetchone()
+    # print(row)
+    if row[1] is None:
+        raise HTTPException(status_code=400, detail="No such user")
+    stmt = insert(OTP).values(
+        purpose = OTPPurposeEnum.USER_REGISTER,
+        otp_code = random.randint(1000,9999),
+        user_id = row[0]
+    )
+    await session.execute(stmt)
+    await session.commit()
+    return {"status": 200, "details": f"OTP: {OTP.c.otp_code}"}
 
 @app.get("/protected-route")
 async def protected_route(current_user: Annotated[UserAuth, Depends(get_current_user)]):
@@ -330,7 +349,8 @@ async def auth_middleware(request: Request, call_next):
         except Exception as e:
             print(f"Token validation failed: {e}")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    
+    # else:
+    #     response = RedirectResponse(url="/main")
     # Продолжение выполнения запроса
     response = await call_next(request)
     return response
