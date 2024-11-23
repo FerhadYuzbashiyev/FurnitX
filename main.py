@@ -283,10 +283,10 @@ async def create_user(request: Request, user_fields: CreateUser = Form(...), ses
 
     access_token = create_access_token(data={"sub": row_id, "email": user_fields.email})
 
-    response = RedirectResponse(url="/main", status_code=303)
+    response = RedirectResponse(url="/otp", status_code=303)
     response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
     response.headers["Authorization"] = f"Bearer {access_token}"
-    otp_create(email=user_fields.email, session=session)
+    await otp_create(email=user_fields.email, session=session)
     return response
 
 @app.get("/login", response_class=HTMLResponse)
@@ -311,6 +311,7 @@ async def login(request: Request, login_form: LoginRequest = Form(...), session:
 
 @app.post("/otp-create")
 async def otp_create(email: str, session: AsyncSession = Depends(get_async_session)):
+    print("OTP CREATE TEST")
     stmt_user = select(User.c.id, User.c.email).where(email == User.c.email) # id and email
     result_user = await session.execute(stmt_user)
     row_user = result_user.fetchone()
