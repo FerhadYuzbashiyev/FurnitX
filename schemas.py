@@ -4,7 +4,7 @@ from fastapi import Form
 from pydantic import BaseModel, Field
 from enum import Enum
 
-from models import CountryEnum, CategoryEnum, MaterialEnum
+from models import CountryEnum, CategoryEnum, MaterialEnum, OTPPurposeEnum
 
 class GetAllTables(BaseModel):
     fullname: str
@@ -34,6 +34,12 @@ class TokenResponse(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+class OTPCheckFields(BaseModel):
+    user_uuid: UUID
+    email: str
+    purpose: OTPPurposeEnum
+    otp_code: str
 
 class InsertFurnitureResponse(BaseModel):
     data: InsertFurniture

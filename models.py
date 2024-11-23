@@ -28,6 +28,14 @@ class CountryEnum(str, PyEnum):
     GERMANY = "germany"
     IRELAND = "ireland"
 
+class OTPPurposeEnum(str, PyEnum):
+    USER_REGISTER = "user_register"
+
+class StatusEnum(str, PyEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    CONTACT_VERIFICATION = "contact_verification"
+
 metadata = MetaData()
 
 Furniture = Table(
@@ -52,5 +60,17 @@ User = Table(
     Column("email", String, nullable=False, unique=True),
     Column("registered_at", TIMESTAMP, default=datetime.utcnow),
     Column("hashed_password", String, nullable=False),
+    Column("status", Enum(StatusEnum), nullable=False)
     # Column("furniture_id", Integer, ForeignKey(Furniture.c.id), nullable=False)
+)
+
+OTP = Table(
+    "otp",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("purpose", Enum(OTPPurposeEnum), nullable=False),
+    Column("otp_code", Integer, nullable=False),
+    Column("user_id", Integer, ForeignKey(User.c.id), nullable=False),
+    Column("implementation_time", TIMESTAMP, default=lambda: datetime.utcnow()),
+    Column("expiration_time", TIMESTAMP, default=lambda: datetime.utcnow() + timedelta(minutes=1)),
 )

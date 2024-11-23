@@ -10,8 +10,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, insert, select, delete
 from auth import create_access_token, get_current_user, get_password_hash, validate_authorization_header, verify_password
 from database import get_async_session, AsyncSession
-from models import Furniture, CountryEnum, MaterialEnum, CategoryEnum, OTPPurposeEnum, User, OTP
-from schemas import CreateUser, GetAllTables, GetAllTablesResponse, InsertFurniture, InsertFurnitureResponse, LoginRequest, TokenResponse, UserAuth, UserData, UserDataResponse
+from models import Furniture, CountryEnum, MaterialEnum, CategoryEnum, OTPPurposeEnum, StatusEnum, User, OTP
+from schemas import CreateUser, GetAllTables, GetAllTablesResponse, InsertFurniture, InsertFurnitureResponse, LoginRequest, OTPCheckFields, TokenResponse, UserAuth, UserData, UserDataResponse
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -257,6 +257,7 @@ async def create_user(request: Request, user_fields: CreateUser = Form(...), ses
         fullname = user_fields.fullname,
         email = user_fields.email,
         hashed_password = hash_password,
+        status = StatusEnum.CONTACT_VERIFICATION
     )
     await session.execute(stmt)
     await session.commit()
@@ -285,8 +286,9 @@ async def create_user(request: Request, user_fields: CreateUser = Form(...), ses
     response = RedirectResponse(url="/main", status_code=303)
     response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
     response.headers["Authorization"] = f"Bearer {access_token}"
+    otp_create(email=user_fields.email, session=session)
     return response
-    
+
 @app.get("/login", response_class=HTMLResponse)
 async def show_login_form(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
@@ -309,20 +311,45 @@ async def login(request: Request, login_form: LoginRequest = Form(...), session:
 
 @app.post("/otp-create")
 async def otp_create(email: str, session: AsyncSession = Depends(get_async_session)):
-    stmt_user = select(User.c.id, User.c.email).where(email == User.c.email)
-    result = await session.execute(stmt_user)
-    row = result.fetchone()
+    stmt_user = select(User.c.id, User.c.email).where(email == User.c.email) # id and email
+    result_user = await session.execute(stmt_user)
+    row_user = result_user.fetchone()
     # print(row)
-    if row[1] is None:
+    if row_user[1] is None: # email
         raise HTTPException(status_code=400, detail="No such user")
-    stmt = insert(OTP).values(
+    stmt_insert = insert(OTP).values(
         purpose = OTPPurposeEnum.USER_REGISTER,
         otp_code = random.randint(1000,9999),
-        user_id = row[0]
+        user_id = row_user[0] # user id
     )
-    await session.execute(stmt)
+    await session.execute(stmt_insert)
     await session.commit()
+    # stmt_exp = select(OTP.c.expiration_time).where(OTP.c.email == email)
+    # result_exp = await session.execute(stmt_exp)
+    # row_exp = result_exp.fetchone()[0]
+
     return {"status": 200, "details": f"OTP: {OTP.c.otp_code}"}
+
+@app.get("/otp", response_class=HTMLResponse)
+async def otp_get(request: Request):
+    return templates.TemplateResponse("otp.html", {"request": request})
+
+@app.post("/otp-check", response_class=HTMLResponse)
+async def otp_check(fields: OTPCheckFields, request: Request, session: AsyncSession = Depends(get_async_session)):
+    stmt_user = select(User.c.user_uuid, User.c.id, User.c.email, OTP.c.purpose).join(OTP, OTP.c.user_id == User.c.id).where(User.c.user_uuid == fields.user_uuid, User.c.email == fields.email, OTP.c.purpose == fields.purpose)
+    result_user = await session.execute(stmt_user)
+    row_user = result_user.fetchone()
+    if row_user is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No such user")
+    stmt_otp = select(OTP.c.expiration_time).where(row_user[1] == OTP.c.user_id).order_by(OTP.c.id.desc())
+    result_otp = await session.execute(stmt_otp)
+    row_otp = result_otp.fetchone()[0]
+    if row_otp < datetime.utcnow():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP code time is expired")
+    if row_otp != fields.otp_code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wrong OTP code")
+    return templates.TemplateResponse("otp.html", {"request": request})
+    
 
 @app.get("/protected-route")
 async def protected_route(current_user: Annotated[UserAuth, Depends(get_current_user)]):
